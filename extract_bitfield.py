@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
+import os
 from pathlib import Path
 
+def readBitfield(input_file, input_file_offset, input_file_size):
 
-def readBitfield(input_file, input_file_offset):
-
-  input_file_name = input_file.name
+  input_file_name = os.path.basename(input_file.name)
   input_file.seek(input_file_offset)
 
   # operation_count is stored in register d0 in the mac rom code
@@ -18,17 +18,25 @@ def readBitfield(input_file, input_file_offset):
 
   output_bytes = bytearray()
   
-  if operation_count <= 14:
+  remaining_file_size = input_file_size - input_file_offset
+  if operation_count <= 14 or operation_count > remaining_file_size:
     return
 
   #print("trying offset "+hex(input_file_offset)+" with PICT size "+hex(operation_count))
 
+  pict_version = "INVALIDPICT"
   for count in range(operation_count):
 
-    # check for valid PICT2 version
+    # check for valid PICT headers
     if count == 14:
+      # note that the size field (named operation count here) of a PICT2 image is not reliable, as it is only 2 bytes long
+      # images bigger that 0xffff will not be saved correctly by this script at the moment
       if output_bytes[10] == 0x00 and output_bytes[11] == 0x11 and output_bytes[12] == 0x02 and output_bytes[13] == 0xff:
-        print("found PICT header at offset "+hex(input_file_offset)+" with PICT size "+hex(operation_count))
+        print("found PICT2 header at offset "+hex(input_file_offset)+" with PICT size "+hex(operation_count))
+        pict_version = "PICT2"
+      elif output_bytes[10] == 0x11 and output_bytes[11] == 0x01 and output_bytes[12] == 0x01:
+        print("found PICT1 header at offset "+hex(input_file_offset)+" with PICT size "+hex(operation_count))
+        pict_version = "PICT1"
       else:
         return
 
@@ -64,15 +72,21 @@ def readBitfield(input_file, input_file_offset):
     bitfield_offset += 5
       
   #print("output bytes: "+output_bytes.hex())
-  output_file_name = "./output_bitfield/" + input_file_name + "_" + hex(input_file_offset) + ".pct"
-  print("writing file to " + output_file_name)
-  output_file = open(output_file_name, "wb")
+  if output_bytes[-1] != 0xff:
+    print("end byte not matching 0xff")
+    pict_version = "INVALID"
+
+  output_file_path = "./output_bitfield/" + input_file_name + "_" + pict_version + "_" + hex(input_file_offset) + ".pct"
+  print("writing file to " + output_file_path)
+  output_file = open(output_file_path, "wb")
+  # we need to append 512 zero bytes to create a valid PICT file
+  output_file.write(512 * b'\x00')
   output_file.write(output_bytes)
 
 
-f_name = sys.argv[1]
-f_size = Path(f_name).stat().st_size
-f = open(f_name, "rb")
+f_path = sys.argv[1]
+f_size = Path(f_path).stat().st_size
+f = open(f_path, "rb")
 
 for f_offset in range(f_size):
-  readBitfield(f, f_offset)
+  readBitfield(f, f_offset, f_size)
