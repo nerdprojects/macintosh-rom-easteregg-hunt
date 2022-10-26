@@ -76,7 +76,7 @@ def readBitfield(input_file, input_file_offset, input_file_size):
     print("end byte not matching 0xff")
     pict_version = "INVALID"
 
-  output_file_path = "./output_bitfield/" + input_file_name + "_" + pict_version + "_" + hex(input_file_offset) + ".pct"
+  output_file_path = "./output_bitfield/" + input_file_name + "_" + pict_version + "_" + hex(input_file_offset) + ".pict"
   print("writing file to " + output_file_path)
   output_file = open(output_file_path, "wb")
   # we need to append 512 zero bytes to create a valid PICT file
